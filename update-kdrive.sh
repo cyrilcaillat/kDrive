@@ -27,6 +27,13 @@ echo "Version disponible  : $REMOTE_VERSION"
 
 if [[ "$INSTALLED_VERSION" == *"$REMOTE_VERSION"* ]]; then
     echo "Déjà à jour, aucune installation nécessaire."
+    if ! pgrep -f "kDrive.AppImage" > /dev/null 2>&1; then
+        echo "kDrive n'est pas en cours d'exécution, lancement..."
+        nohup "$INSTALL_PATH" > /dev/null 2>&1 &
+        echo "kDrive lancé (PID $!)"
+    else
+        echo "kDrive est déjà en cours d'exécution."
+    fi
     exit 0
 fi
 
