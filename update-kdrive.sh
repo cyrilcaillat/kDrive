@@ -7,7 +7,7 @@ REPO="cyrilcaillat/kDrive"
 # Version installée
 INSTALLED_VERSION="(inconnue)"
 if [[ -x "$INSTALL_PATH" ]]; then
-    INSTALLED_VERSION=$("$INSTALL_PATH" --version 2>/dev/null | grep -oP 'version \K[\d.]+( \(build \d+\))?' || echo "(inconnue)")
+    INSTALLED_VERSION=$("$INSTALL_PATH" --version 2>/dev/null | grep -oP 'version \K[\d.]+( \(build \d+\))?' | sed 's/ (build \([0-9]*\))/.\1/' || echo "(inconnue)")
 fi
 echo "Version installée : $INSTALLED_VERSION"
 
