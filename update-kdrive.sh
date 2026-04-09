@@ -13,20 +13,49 @@ log_error() {
 INSTALL_PATH="$HOME/Applications/kDrive.AppImage"
 REPO="cyrilcaillat/kDrive"
 
+log "========================================"
+log "Début de la vérification kDrive"
+log "========================================"
+
 # Version installée
 INSTALLED_VERSION="(inconnue)"
 if [[ -x "$INSTALL_PATH" ]]; then
-    INSTALLED_VERSION=$("$INSTALL_PATH" --version 2>/dev/null | grep -oP 'version \K[\d.]+( \(build \d+\))?' | sed 's/ (build \([0-9]*\))/.\1/' || echo "(inconnue)")
+    # Tenter avec offscreen pour éviter l'erreur Qt sans display (anacron)
+    RAW_VERSION_OUTPUT=$(QT_QPA_PLATFORM=offscreen "$INSTALL_PATH" --version 2>&1 || true)
+    log "Sortie brute de --version : '$RAW_VERSION_OUTPUT'"
+    INSTALLED_VERSION=$(echo "$RAW_VERSION_OUTPUT" | grep -oP 'version \K[\d.]+( \(build \d+\))?' | sed 's/ (build \([0-9]*\))/.\1/' || true)
+    if [[ -z "$INSTALLED_VERSION" ]]; then
+        # Fallback : extraire la version depuis les métadonnées ELF du fichier
+        RAW_STRINGS=$(strings "$INSTALL_PATH" 2>/dev/null | grep -oP 'kDrive-\K[\d]+\.[\d]+\.[\d]+\.[\d]+' | head -1 || true)
+        if [[ -n "$RAW_STRINGS" ]]; then
+            INSTALLED_VERSION="$RAW_STRINGS"
+            log "Version extraite depuis les métadonnées du binaire"
+        else
+            INSTALLED_VERSION="(inconnue)"
+            log "Impossible d'extraire la version depuis la sortie ou le binaire"
+        fi
+    fi
+else
+    log "Fichier $INSTALL_PATH non trouvé ou non exécutable"
 fi
 log "Version installée : $INSTALLED_VERSION"
 
 # Récupérer le nom du dernier fichier AppImage dans le dépôt
 log "Recherche de la dernière version sur GitHub..."
-API_RESPONSE=$(curl -fsSL "https://api.github.com/repos/${REPO}/git/trees/main?recursive=1")
+API_URL="https://api.github.com/repos/${REPO}/git/trees/main?recursive=1"
+log "Appel API : $API_URL"
+API_RESPONSE=$(curl -fsSL "$API_URL" 2>&1) || {
+    log_error "échec de l'appel API GitHub (code retour: $?)"
+    log_error "Réponse : $API_RESPONSE"
+    exit 1
+}
+log "Réponse API reçue ($(echo "$API_RESPONSE" | wc -c) octets)"
 APPIMAGE_NAME=$(echo "$API_RESPONSE" | jq -r '.tree[] | select(.path | endswith(".AppImage")) | .path' | tail -1)
+log "Fichier AppImage trouvé : '${APPIMAGE_NAME:-}'"
 
 if [[ -z "$APPIMAGE_NAME" ]]; then
     log_error "aucun fichier AppImage trouvé dans le dépôt."
+    log_error "Contenu de la réponse API (truncated) : $(echo "$API_RESPONSE" | head -c 500)"
     exit 1
 fi
 
