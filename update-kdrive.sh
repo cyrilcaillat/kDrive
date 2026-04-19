@@ -10,12 +10,27 @@ log_error() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
 }
 
-INSTALL_PATH="$HOME/Applications/kDrive.AppImage"
+DEFAULT_INSTALL_PATH="/opt/kDrive.AppImage"
 REPO="cyrilcaillat/kDrive"
+
+# Déterminer l'utilisateur de bureau (le premier utilisateur connecté en session graphique)
+DESKTOP_USER=$(who | awk '/\(:/{print $1; exit}')
+if [[ -z "$DESKTOP_USER" ]]; then
+    DESKTOP_USER=$(logname 2>/dev/null || echo "")
+fi
+
+# Détecter le chemin du kDrive en cours d'exécution
+RUNNING_PATH=$(pgrep -af 'kDrive.*\.AppImage' | grep -v grep | head -1 | awk '{print $2}' || true)
+if [[ -n "$RUNNING_PATH" && -x "$RUNNING_PATH" ]]; then
+    INSTALL_PATH="$RUNNING_PATH"
+else
+    INSTALL_PATH="$DEFAULT_INSTALL_PATH"
+fi
 
 log "========================================"
 log "Début de la vérification kDrive"
 log "========================================"
+log "Chemin d'installation : $INSTALL_PATH"
 
 # Version installée
 INSTALLED_VERSION="(inconnue)"
@@ -66,9 +81,13 @@ log "Version disponible  : $REMOTE_VERSION"
 if [[ "$INSTALLED_VERSION" == *"$REMOTE_VERSION"* ]]; then
     log "Déjà à jour, aucune installation nécessaire."
     if ! pgrep -f "kDrive.AppImage" > /dev/null 2>&1; then
-        log "kDrive n'est pas en cours d'exécution, lancement..."
-        nohup "$INSTALL_PATH" > /dev/null 2>&1 &
-        log "kDrive lancé (PID $!)"
+        if [[ -n "$DESKTOP_USER" ]]; then
+            log "kDrive n'est pas en cours d'exécution, lancement en tant que $DESKTOP_USER..."
+            runuser -u "$DESKTOP_USER" -- nohup "$INSTALL_PATH" > /dev/null 2>&1 &
+            log "kDrive lancé (PID $!)"
+        else
+            log "Aucun utilisateur de bureau détecté, kDrive ne sera pas lancé."
+        fi
     else
         log "kDrive est déjà en cours d'exécution."
     fi
@@ -86,16 +105,19 @@ fi
 
 # Télécharger via l'URL LFS media
 DOWNLOAD_URL="https://media.githubusercontent.com/media/${REPO}/main/${APPIMAGE_NAME}"
-mkdir -p "$HOME/Applications"
 
 log "Téléchargement de $APPIMAGE_NAME..."
 curl -fL --progress-bar "$DOWNLOAD_URL" -o "$INSTALL_PATH"
 
-chmod +x "$INSTALL_PATH"
+chmod 755 "$INSTALL_PATH"
 
 log "Mise à jour terminée : $INSTALL_PATH ($REMOTE_VERSION)"
 
 # Relancer kDrive
-log "Lancement de kDrive..."
-nohup "$INSTALL_PATH" > /dev/null 2>&1 &
-log "kDrive lancé (PID $!)"
+if [[ -n "$DESKTOP_USER" ]]; then
+    log "Lancement de kDrive en tant que $DESKTOP_USER..."
+    runuser -u "$DESKTOP_USER" -- nohup "$INSTALL_PATH" > /dev/null 2>&1 &
+    log "kDrive lancé (PID $!)"
+else
+    log "Aucun utilisateur de bureau détecté, kDrive ne sera pas lancé."
+fi
