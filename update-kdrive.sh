@@ -106,7 +106,7 @@ fi
 # Télécharger via l'URL LFS media
 DOWNLOAD_URL="https://media.githubusercontent.com/media/${REPO}/main/${APPIMAGE_NAME}"
 
-log "Téléchargement de $APPIMAGE_NAME..."
+log "Téléchargement de $DOWNLOAD_URL..."
 curl -fL --progress-bar "$DOWNLOAD_URL" -o "$INSTALL_PATH"
 
 chmod 755 "$INSTALL_PATH"
