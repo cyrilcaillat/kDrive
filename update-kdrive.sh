@@ -103,8 +103,9 @@ else
     log "kDrive n'est pas en cours d'exécution."
 fi
 
-# Télécharger via l'URL LFS media
-DOWNLOAD_URL="https://media.githubusercontent.com/media/${REPO}/main/${APPIMAGE_NAME}"
+# Télécharger via l'URL LFS media (le SHA du commit évite le 404 mis en cache sur "main")
+COMMIT_SHA=$(curl -fsSL "https://api.github.com/repos/${REPO}/commits/main" | jq -r '.sha' || true)
+DOWNLOAD_URL="https://media.githubusercontent.com/media/${REPO}/${COMMIT_SHA:-main}/${APPIMAGE_NAME}"
 
 log "Téléchargement de $DOWNLOAD_URL..."
 curl -fL --progress-bar "$DOWNLOAD_URL" -o "$INSTALL_PATH"
